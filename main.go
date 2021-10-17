@@ -9,16 +9,15 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-var templates = template.Must(template.ParseFiles("index.html"))
+var templates = template.Must(template.ParseFiles("index.ejs"))
 var conection *sql.DB
+var err error
 
 func main() {
-	conection, err := sql.Open("mysql", "root:@tcp(127.0.0.1)/Rcp")
+	conection, err = sql.Open("mysql", "root:@/rcp")
 	if err != nil {
 		panic(err.Error())
 	}
-	defer conection.Close()
-
 	err = conection.Ping()
 	if err != nil {
 		panic(err.Error())
@@ -34,32 +33,28 @@ var u string
 
 func registerComp(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		fmt.Print("post")
-		http.ServeFile(w, r, "register.html")
+		http.ServeFile(w, r, "register.ejs")
 		return
 	}
-	fmt.Print("postcuerpo")
 	username := r.FormValue("username")
 	firstname := r.FormValue("firstname")
 	lastname := r.FormValue("lastname")
+	email := r.FormValue("email")
 	password := r.FormValue("password")
-	confirmpwd := r.FormValue("confirmPassword")
+	confirmpwd := r.FormValue("confirmpwd")
 	country := r.FormValue("country")
+	fmt.Println("Pasword:" + password)
+	fmt.Println("Confirm Pasword:" + confirmpwd)
 	err := conection.QueryRow("SELECT Username FROM usuarios WHERE username=?", username).Scan(&u)
 	if err == sql.ErrNoRows {
-		if err == nil {
-			insertuser, err := conection.Prepare("INSERT INTO usuarios(Username,Firstname,Lastname,Email,Password,ConfirmPwd,Country) VALUES(username,firstname,lastname,password,confirmpwd,country)")
-			if err != nil {
-				panic(err.Error())
-			} else {
-				if len(firstname) > 0 || len(lastname) > 0 {
-					if len(username) > 5 && len(username) < 20 || len(password) > 0 {
-						if len(confirmpwd) > 0 || len(country) > 0 {
-							if password == confirmpwd {
-								insertuser.Exec(username, firstname, lastname, password, confirmpwd, country)
-							}
-						}
-					}
+		fmt.Print("UNO")
+		if len(username) > 5 && len(username) < 20 || len(password) > 0 {
+			fmt.Print("DPS")
+			if len(confirmpwd) > 0 || len(country) > 0 {
+				fmt.Print("TRES")
+				if password == confirmpwd {
+					fmt.Print("CUATRO")
+					_, err = conection.Exec("INSERT INTO usuarios(Username, Firstname, Lastname, Email,Password,Country) VALUES(?, ?,?,?,?,?)", username, firstname, lastname, email, password, country)
 				}
 			}
 		}
@@ -73,25 +68,20 @@ var pw string
 
 func loadLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.ServeFile(w, r, "login.html")
+		http.ServeFile(w, r, "login.ejs")
 		return
 	}
 	username := r.FormValue("username")
-	password := r.FormValue("password")
-	err := conection.QueryRow("SELECT Username, Password FROM usuarios WHERE Username=? AND Password=?", username, password).Scan(&us, &pw)
-	fmt.Print("erorrrrrrrrrrrrrrrr")
+	//password := r.FormValue("password")
+	err := conection.QueryRow("SELECT Username, Password FROM usuarios WHERE Username=?", username).Scan(&us, &pw)
 	if err != nil {
-		fmt.Print("primero")
 		http.Redirect(w, r, "/login", 301)
 		return
-	} else {
-		fmt.Print("segundo")
-		http.Redirect(w, r, "/index", 301)
 	}
+	http.Redirect(w, r, "/index", 301)
 }
 func loadUsers(w http.ResponseWriter, r *http.Request) {
-
-	users, err := conection.Query("SELECT Username, Firstname, Lastname FROM usuarios")
+	comps, err := conection.Query("SELECT Username, Firstname, Lastname FROM usuarios")
 
 	if err != nil {
 		http.Error(w, "ERROR", 500)
@@ -99,11 +89,11 @@ func loadUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	competitor := Competitor{}
 	competitors := []Competitor{}
-	for users.Next() {
+	for comps.Next() {
 		var u string
 		var f string
 		var l string
-		err = users.Scan(&u, &f, &l)
+		err = comps.Scan(&u, &f, &l)
 		if err != nil {
 			http.Error(w, "ERROR", 500)
 			return
@@ -111,18 +101,19 @@ func loadUsers(w http.ResponseWriter, r *http.Request) {
 		competitor.username = u
 		competitor.firstname = f
 		competitor.lastname = l
+		fmt.Println(u)
+		fmt.Println(f)
+		fmt.Println(l)
+
 		competitors = append(competitors, competitor)
+
 	}
-	if err := templates.Execute(w, users); err != nil {
+	if err := templates.Execute(w, competitors); err != nil {
+		fmt.Print("nulo")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 type Competitor struct {
-	firstname  string
-	lastname   string
-	username   string
-	password   string
-	confirmPwd string
-	country    string
+	firstname, lastname, username string
 }
