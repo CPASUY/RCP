@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8"></meta>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"></meta>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"></meta>
     <title>Login page - RPC</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-F3w7mX95PdgyTmZZMECAngseQB83DfGTowi0iMjiWaeVhAn4FJkqJByhZMI3AhiU" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-F3w7mX95PdgyTmZZMECAngseQB83DfGTowi0iMjiWaeVhAn4FJkqJByhZMI3AhiU" crossorigin="anonymous"></link>
 </head>
 <body>
     <header>
@@ -29,13 +29,13 @@
         </nav>
     </header>
 
-    <br>
+    <br></br>
     <div class="text-center">
     <div>
       <h1 class="text-center">Competitive Programming Network</h1> <br />
     <div>
     <a class="navbar-brand" href="#"><img src="https://pbs.twimg.com/profile_images/493847405670850561/qslkfHlq_400x400.jpeg" alt="RPC_Logo" width="100" height="100"/></a>
-      <br>
+      <br></br>
             <div class="mt-3">
                 <a href="/rcp-auth"><input type="button" value="Log out" class="btn btn-outline-danger btn-block mt-3" /></a>
 
@@ -71,6 +71,7 @@
                 </table>
             </div>
         </div>
+    </div>
     </div>
 </body>
 </html>
