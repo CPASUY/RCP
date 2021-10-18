@@ -1,4 +1,4 @@
-
+<!DOCTYPE html>
 <html>
 
 <head>
@@ -41,8 +41,21 @@
           <div class="row">
                 <form action="" method="POST" >
                     <div class="form-group">
-                        <label class="form-label" for="email">Email</label><input class="form-control" name="email" type="email" id="email" />
+                        <label class="form-label" for="email">Email</label><input class="form-control" name="email" type="text" id="email" onkeydown="validation()" />
                     </div>
+                    <script type="text/javascript">
+                    function validation(){
+                        var text = document.getElementById("text").value;
+                        var email = document.getElementById("email").value;
+                        var pattern = /^[^ ]+@[^ ]+\.[a-z]{2,3}$/;
+                        if(email.match(pattern)){
+                            text.innerHTML="Your email is valid"
+                        }
+                        else{
+                            text.innerHTML="Please enter a email  valid"
+                        }
+                    }
+                    </script>
                     <div class="form-group">
                         <label class="form-label" for="username">Username</label><input class="form-control" name="username" type="text" id="username" />
                     </div>

@@ -1,19 +1,28 @@
 package main
 
 import (
+	"bytes"
+	"crypto/tls"
 	"database/sql"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
+	"net/mail"
+	"net/smtp"
+	"regexp"
 
+	_ "github.com/go-playground/validator/v10"
 	_ "github.com/go-sql-driver/mysql"
+	"golang.org/x/crypto/bcrypt"
 )
 
-var templates = template.Must(template.ParseFiles("index.ejs"))
+var templates = template.Must(template.ParseFiles("index.html"))
 var conection *sql.DB
 var err error
 
 func main() {
+
 	conection, err = sql.Open("mysql", "root:@/rcp")
 	if err != nil {
 		panic(err.Error())
@@ -33,7 +42,7 @@ var u string
 
 func registerComp(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.ServeFile(w, r, "register.ejs")
+		http.ServeFile(w, r, "register.html")
 		return
 	}
 	username := r.FormValue("username")
@@ -43,18 +52,22 @@ func registerComp(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	confirmpwd := r.FormValue("confirmpwd")
 	country := r.FormValue("country")
-	fmt.Println("Pasword:" + password)
-	fmt.Println("Confirm Pasword:" + confirmpwd)
+	fmt.Println("PasswordSign " + password)
 	err := conection.QueryRow("SELECT Username FROM usuarios WHERE username=?", username).Scan(&u)
 	if err == sql.ErrNoRows {
-		fmt.Print("UNO")
 		if len(username) > 5 && len(username) < 20 || len(password) > 0 {
-			fmt.Print("DPS")
 			if len(confirmpwd) > 0 || len(country) > 0 {
-				fmt.Print("TRES")
 				if password == confirmpwd {
-					fmt.Print("CUATRO")
-					_, err = conection.Exec("INSERT INTO usuarios(Username, Firstname, Lastname, Email,Password,Country) VALUES(?, ?,?,?,?,?)", username, firstname, lastname, email, password, country)
+					hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+					if err != nil {
+						http.Error(w, "Error", 500)
+						return
+					}
+					em := isEmailValid(email)
+					if em == true {
+						sendEmail(firstname, email)
+						_, err = conection.Exec("INSERT INTO usuarios(Username, Firstname, Lastname, Email,Password,Country) VALUES(?, ?,?,?,?,?)", username, firstname, lastname, email, hash, country)
+					}
 				}
 			}
 		}
@@ -62,18 +75,27 @@ func registerComp(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", 301)
 	return
 }
+func isEmailValid(e string) bool {
+	emailRegex := regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
+	return emailRegex.MatchString(e)
+}
 
 var us string
 var pw string
 
 func loadLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.ServeFile(w, r, "login.ejs")
+		http.ServeFile(w, r, "login.html")
 		return
 	}
 	username := r.FormValue("username")
-	//password := r.FormValue("password")
-	err := conection.QueryRow("SELECT Username, Password FROM usuarios WHERE Username=?", username).Scan(&us, &pw)
+	password := r.FormValue("password")
+	err := conection.QueryRow("SELECT Username, Password FROM usuarios WHERE Username=? ", username).Scan(&us, &pw)
+	if err != nil {
+		http.Redirect(w, r, "/login", 301)
+		return
+	}
+	err = bcrypt.CompareHashAndPassword([]byte(pw), []byte(password))
 	if err != nil {
 		http.Redirect(w, r, "/login", 301)
 		return
@@ -109,11 +131,81 @@ func loadUsers(w http.ResponseWriter, r *http.Request) {
 
 	}
 	if err := templates.Execute(w, competitors); err != nil {
-		fmt.Print("nulo")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 type Competitor struct {
 	firstname, lastname, username string
+}
+type Dest struct {
+	Name string
+}
+
+func sendEmail(f string, e string) {
+	from := mail.Address{"RCP", "carolinapasuy@gmail.com"}
+	to := mail.Address{f, e}
+	subject := "Enviando correo desde GO"
+	dest := Dest{Name: to.Address}
+
+	headers := make(map[string]string)
+	headers["From"] = from.String()
+	headers["To"] = to.String()
+	headers["Subject"] = subject
+	headers["Content-Type"] = `text/html; charset="UTF-8"`
+
+	message := ""
+	for k, v := range headers {
+		message += fmt.Sprintf("%s: %s\r\n", k, v)
+	}
+
+	t, err := template.ParseFiles("template.html")
+	checkErr(err)
+
+	buf := new(bytes.Buffer)
+	err = t.Execute(buf, dest)
+	checkErr(err)
+
+	message += buf.String()
+
+	servername := "smtp.gmail.com:465"
+	host := "smtp.gmail.com"
+
+	auth := smtp.PlainAuth("", "carolinapasuy@gmail.com", "lcpp2001", host)
+
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true,
+		ServerName:         host,
+	}
+
+	conn, err := tls.Dial("tcp", servername, tlsConfig)
+	checkErr(err)
+
+	client, err := smtp.NewClient(conn, host)
+	checkErr(err)
+
+	err = client.Auth(auth)
+	checkErr(err)
+
+	err = client.Mail(from.Address)
+	checkErr(err)
+
+	err = client.Rcpt(to.Address)
+	checkErr(err)
+
+	w, err := client.Data()
+	checkErr(err)
+
+	_, err = w.Write([]byte(message))
+	checkErr(err)
+
+	err = w.Close()
+	checkErr(err)
+
+	client.Quit()
+}
+func checkErr(err error) {
+	if err != nil {
+		log.Panic(err)
+	}
 }
