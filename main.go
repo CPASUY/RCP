@@ -5,24 +5,23 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"net/mail"
 	"net/smtp"
 	"regexp"
+	"text/template"
 
 	_ "github.com/go-playground/validator/v10"
 	_ "github.com/go-sql-driver/mysql"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var templates = template.Must(template.ParseFiles("index.html"))
+//var templates = template.Must(template.ParseFiles("index.html"))
 var conection *sql.DB
 var err error
 
 func main() {
-
 	conection, err = sql.Open("mysql", "root:@/rcp")
 	if err != nil {
 		panic(err.Error())
@@ -41,6 +40,8 @@ func main() {
 var u string
 
 func registerComp(w http.ResponseWriter, r *http.Request) {
+	alerta := Message{}
+	alerta.Msg = "Fill all the boxes"
 	if r.Method != "POST" {
 		http.ServeFile(w, r, "register.html")
 		return
@@ -55,8 +56,8 @@ func registerComp(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("PasswordSign " + password)
 	err := conection.QueryRow("SELECT Username FROM usuarios WHERE username=?", username).Scan(&u)
 	if err == sql.ErrNoRows {
-		if len(username) > 5 && len(username) < 20 || len(password) > 0 {
-			if len(confirmpwd) > 0 || len(country) > 0 {
+		if (len(username) > 5 && len(username) < 20) || (len(password) > 0 && len(confirmpwd) > 0){
+			if len(country) > 0 {
 				if password == confirmpwd {
 					hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 					if err != nil {
@@ -67,10 +68,36 @@ func registerComp(w http.ResponseWriter, r *http.Request) {
 					if em == true {
 						sendEmail(firstname, email)
 						_, err = conection.Exec("INSERT INTO usuarios(Username, Firstname, Lastname, Email,Password,Country) VALUES(?, ?,?,?,?,?)", username, firstname, lastname, email, hash, country)
+					} else{
+						alerta.Msg = "Digit a valid email"
+						t, _ := template.ParseFiles("register.html")
+						t.Execute(w, alerta)
+						return
 					}
+
+				} else{
+					alerta.Msg = "Passwords do not match"
+					t, _ := template.ParseFiles("register.html")
+					t.Execute(w, alerta)
+					return
 				}
+			} else{
+				alerta.Msg = "Digit a contry"
+				t, _ := template.ParseFiles("register.html")
+				t.Execute(w, alerta)
+				return
 			}
+		} else{
+			alerta.Msg = "Digit a username and password valids"
+			t, _ := template.ParseFiles("register.html")
+			t.Execute(w, alerta)
+			return
 		}
+	}  else{
+			alerta.Msg = "The username already exists"
+			t, _ := template.ParseFiles("register.html")
+			t.Execute(w, alerta)
+			return
 	}
 	http.Redirect(w, r, "/", 301)
 	return
@@ -84,24 +111,33 @@ var us string
 var pw string
 
 func loadLogin(w http.ResponseWriter, r *http.Request) {
+	alerta := Message{}
+	alerta.Msg = "Welcome, digit your user and password"
 	if r.Method != "POST" {
 		http.ServeFile(w, r, "login.html")
 		return
 	}
 	username := r.FormValue("username")
+	
 	password := r.FormValue("password")
+
 	err := conection.QueryRow("SELECT Username, Password FROM usuarios WHERE Username=? ", username).Scan(&us, &pw)
 	if err != nil {
-		http.Redirect(w, r, "/login", 301)
+		alerta.Msg = "Digit a user and password valids"
+		t, _ := template.ParseFiles("login.html")
+		t.Execute(w, alerta)
 		return
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(pw), []byte(password))
 	if err != nil {
-		http.Redirect(w, r, "/login", 301)
+		alerta.Msg = "Digit a user and password valids"
+		t, _ := template.ParseFiles("login.html")
+		t.Execute(w, alerta)
 		return
 	}
 	http.Redirect(w, r, "/index", 301)
 }
+
 func loadUsers(w http.ResponseWriter, r *http.Request) {
 	comps, err := conection.Query("SELECT Username, Firstname, Lastname FROM usuarios")
 
@@ -120,30 +156,33 @@ func loadUsers(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "ERROR", 500)
 			return
 		}
-		competitor.username = u
-		competitor.firstname = f
-		competitor.lastname = l
-		fmt.Println(u)
-		fmt.Println(f)
-		fmt.Println(l)
+		competitor.Username = u
+		competitor.Firstname = f
+		competitor.Lastname = l
 
 		competitors = append(competitors, competitor)
 
 	}
-	if err := templates.Execute(w, competitors); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+
+	fmt.Println(competitors)
+	t, _ := template.ParseFiles("index.html")
+	t.Execute(w, competitors)
 }
 
 type Competitor struct {
-	firstname, lastname, username string
+	Firstname, Lastname, Username string
 }
+
+type Message struct {
+	Msg string
+}
+
 type Dest struct {
 	Name string
 }
 
 func sendEmail(f string, e string) {
-	from := mail.Address{"RCP", "carolinapasuy@gmail.com"}
+	from := mail.Address{"RCP", "soportercpicesi@gmail.com"}
 	to := mail.Address{f, e}
 	subject := "Enviando correo desde GO"
 	dest := Dest{Name: to.Address}
@@ -171,7 +210,7 @@ func sendEmail(f string, e string) {
 	servername := "smtp.gmail.com:465"
 	host := "smtp.gmail.com"
 
-	auth := smtp.PlainAuth("", "carolinapasuy@gmail.com", "lcpp2001", host)
+	auth := smtp.PlainAuth("", "soportercpicesi@gmail.com", "icesi123", host)
 
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true,
